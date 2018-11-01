@@ -17,12 +17,11 @@
 # foreign_option_3='dhcp-option DOMAIN be.bnc.ch'
 # foreign_option_4='dhcp-option DOMAIN-SEARCH bnc.local'
 
-## The 'type' builtins will look for file in $PATH variable, so we set the
-## PATH below. You might need to directly set the path to 'resolvconf'
-## manually if it still doesn't work, i.e.
-## RESOLVCONF=/usr/sbin/resolvconf
-export PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin
-RESOLVCONF=$(type -p resolvconf)
+####
+## Forked from https://github.com/masterkorp/openvpn-update-resolv-conf/blob/master/update-resolv-conf.sh
+## Modified to work in a netconfig based linux distribution like OpenSUSE without much hack
+## This script will update the dns settings using netconfig utility instaed of resolvconf
+####
 
 case $script_type in
 
@@ -42,30 +41,14 @@ up)
       fi
     fi
   done
-  R=""
-  if [ "$IF_DNS_SEARCH" ]; then
-    R="search "
-    for DS in $IF_DNS_SEARCH ; do
-      R="${R} $DS"
-    done
-  R="${R}
-"
-  fi
-
-  for NS in $IF_DNS_NAMESERVERS ; do
-    R="${R}nameserver $NS
-"
-  done
-  #echo -n "$R" | $RESOLVCONF -x -p -a "${dev}"
-  echo -n "$R" | $RESOLVCONF -x -a "${dev}.inet"
+  cat<<EOF | /sbin/netconfig -v modify -i $dev -s openvpn
+DNSSERVERS='$IF_DNS_NAMESERVERS'
+DNSSEARCH='$IF_DNS_SEARCH'
+EOF
   ;;
 down)
-  $RESOLVCONF -d "${dev}.inet"
+  /sbin/netconfig remove -i ${dev} -s openvpn 
   ;;
 esac
 
-# Workaround / jm@epiclabs.io 
-# force exit with no errors. Due to an apparent conflict with the Network Manager
-# $RESOLVCONF sometimes exits with error code 6 even though it has performed the
-# action correctly and OpenVPN shuts down.
 exit 0
